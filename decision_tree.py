@@ -1,6 +1,6 @@
 import csv
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 class Node:
     def __init__(self, feature_index=None, split_value=None, then_child=None, else_child=None, leaf_label=None):
@@ -13,16 +13,32 @@ class Node:
     def is_leaf_node(self):
         return self.leaf_label is not None
 
+def predict (node, data):
+    if node.is_leaf_node():
+        return node.leaf_label
+    if data[node.feature_index]< float(node.split_value) :
+        return predict(node.then_child,data)
+    return predict(node.else_child, data)
 
+
+def predict_arr (node, data_points):
+    predictions = list()
+    for row in data_points:
+        result=  predict(node,row)
+        predictions.append(result)
+    return predictions
 def visualize_decision_tree(node, depth=0):
     indent = "    " * depth
     if node.is_leaf_node():
-        print(f"{indent}Class {node.leaf_label}")
+        print(f"{indent}Class {node.leaf_label} Depth: {depth}")
+        return 1
     else:
-        print(f"{indent}x[{node.feature_index}] < {node.split_value} :")
-        visualize_decision_tree(node.then_child, depth + 1)
-        print(f"{indent}else:")
-        visualize_decision_tree(node.else_child, depth + 1)
+
+        print(f"{indent}Depth {depth}.1 :: x[{node.feature_index}] < {node.split_value} :")
+        num = visualize_decision_tree(node.then_child, depth + 1)
+        print(f"{indent}Depth {depth}.2 ::else:")
+        num += visualize_decision_tree(node.else_child, depth + 1)
+        return num
 
 
 def read_input(input_file):
@@ -87,7 +103,7 @@ def get_gain_ratio(candidate_split, feature_index, input_data_sorted_on_feature)
     info_gain = calc_entropy(labels_sorted) - (len(left_labels) / n) * calc_entropy(left_labels) - (
                 len(right_labels) / n) * calc_entropy(
         right_labels)
-
+    #print(f"----Information gain:{info_gain}")
     # This validates the termination condition 3 when the entropy of a split is zero, that the split results in all data
     # In a single bucket, this returns the gain ratio as zero
     if len(then_features_sorted) == 0:
@@ -97,7 +113,7 @@ def get_gain_ratio(candidate_split, feature_index, input_data_sorted_on_feature)
     left_ratio = len(then_features_sorted) / n
     right_ratio = len(else_features_sorted) / n
     split_info = -(left_ratio * np.log2(left_ratio) + right_ratio * np.log2(right_ratio))
-
+    #print(f"----Gain ratio:{info_gain / split_info}")
     return info_gain / split_info
 
 
@@ -113,6 +129,7 @@ def build_decision_tree(input_data_to_build):
     best_split = []
 
     for candidate_split_0 in candidate_splits_0:
+        #print(f"candidate_split on feature x0:{candidate_split_0['split_value']}")
         gain_ratio_new = get_gain_ratio(candidate_split_0, 0, sorted_data_feature_0)
         if gain_ratio_new > gain_ratio:
             gain_ratio = gain_ratio_new
@@ -121,6 +138,7 @@ def build_decision_tree(input_data_to_build):
 
     # Checking splits on feature 1
     for candidate_split_1 in candidate_splits_1:
+        #print(f"candidate_split on feature x1:{candidate_split_1['split_value']}")
         gain_ratio_new = get_gain_ratio(candidate_split_1, 1, sorted_data_feature_1)
         if gain_ratio_new > gain_ratio:
             gain_ratio = gain_ratio_new
@@ -133,12 +151,40 @@ def build_decision_tree(input_data_to_build):
         labels = [item[2] for item in input_data_to_build]
         leaf_label = np.argmax(np.bincount(labels))
         return Node(leaf_label=leaf_label)
-
+    #print("==============================================================")
     then_node_child = build_decision_tree(then_branch)
     else_node_child = build_decision_tree(else_branch)
     return Node(best_split['feature_index'], best_split['split_value'], then_node_child, else_node_child)
 
 
-input_data = read_input("same_label.txt")
+input_data = read_input("D8192.txt")
 decision_tree = build_decision_tree(input_data)
-visualize_decision_tree(decision_tree, 0)
+#num = visualize_decision_tree(decision_tree, 0)
+#print (f"Num nodes {num}")
+
+
+data = np.loadtxt('Dbig.txt')
+X = data[:, :-1]
+Y = data[:, -1]
+Z = predict_arr(decision_tree, X)
+error = sum(1 for i, j in zip(Z, Y) if i != j)/len(Y)
+print(f"Error {error}")
+
+# data = np.loadtxt('D2048.txt')
+# X = data[:, :-1]
+# y = data[:, -1]
+#
+# # Define a grid of points in the feature space
+# x_min, x_max = X[:, 0].min() - 0.1, X[:, 0].max() + 0.1
+# y_min, y_max = X[:, 1].min() - 0.1, X[:, 1].max() + 0.1
+# xx, yy = np.meshgrid(np.linspace(x_min, x_max, 10),
+#                      np.linspace(y_min, y_max, 10))
+# Z = predict_arr(decision_tree, np.c_[xx.ravel(), yy.ravel()])
+# Z_np = np.array(Z)
+# b = Z_np.reshape(xx.shape)
+# # Plot the decision boundary
+# plt.contourf(xx, yy, b, alpha=0.5)
+# plt.scatter(X[:, 0], X[:, 1], c=y, cmap='bwr')
+# plt.xlabel('Feature 1')
+# plt.ylabel('Feature 2')
+# plt.show()
